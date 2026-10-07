@@ -12,7 +12,7 @@ let state = {id:"", meta:"", duration:"", entities:[]};
 let editing = null;
 let draftArgs = [];
 
-const blank = () => ({ type: ENTITY_TYPES[0], h: "0.5", on: true, mover: Object.keys(MOVERS)[0], args: [] });
+const blank = () => ({ type: ENTITY_TYPES[0], h: "0", on: true, mover: Object.keys(MOVERS)[0], args: ["0.5"] });
 const ser = e => [e.type, e.h, e.on, e.mover, ...e.args].join(",");
 function parse(s){
   const p = String(s).split(",").map(x => x.trim());
@@ -53,7 +53,8 @@ window.addEventListener("storage", ev => {
 function init() {
   $("type").innerHTML = ENTITY_TYPES.map(t => `<option value="${t}">${t}</option>`).join("");
   $("mover").innerHTML = Object.keys(MOVERS).map(m => `<option>${m}</option>`).join("");
-  draftArgs = [];
+  $("h").value = "0";
+  draftArgs = ["0.5"];
   renderArgs();
   renderAll();
 }
@@ -61,10 +62,17 @@ function init() {
 function renderArgs(){
   const m = $("mover").value, names = [...COMMON, ...(MOVERS[m] || [])];
   const n = Math.max(names.length, draftArgs.length);
-  $("args").innerHTML = Array.from({length:n}, (_, i) =>
-    `<div><label for="a${i}">${names[i] || "extra " + (i+1)}</label><input id="a${i}" type="number" step="any" value="${draftArgs[i] ?? ""}" data-i="${i}"></div>`).join("");
+  $("args").innerHTML = Array.from({length:n}, (_, i) => {
+    const isStartPos = (i === 0 && names[i] === "startPosition");
+    const val = draftArgs[i] ?? (isStartPos ? "0.5" : "");
+    const attrs = isStartPos 
+      ? `min="0" max="1" step="0.1"` 
+      : `step="any"`;
+    return `<div><label for="a${i}">${names[i] || "extra " + (i+1)}</label><input id="a${i}" type="number" ${attrs} value="${val}" data-i="${i}"></div>`;
+  }).join("");
   updatePreview();
 }
+
 function readDraft(){
   draftArgs = [...document.querySelectorAll("#args input")].map(i => i.value.trim());
 }
@@ -115,11 +123,12 @@ function startEdit(i){
   $("err").textContent = ""; renderList();
   $("type").scrollIntoView({block:"center", behavior:"smooth"});
 }
+
 function stopEdit(){
   editing = null;
   const keep = {type:$("type").value, mover:$("mover").value};
   loadForm({...blank(), mover:keep.mover, type:keep.type});
-  $("h").value = "";
+  $("h").value = "0";
   $("edTitle").textContent = "New entity";
   $("save").textContent = "Add"; $("cancel").hidden = true; $("err").textContent = "";
   renderList();
