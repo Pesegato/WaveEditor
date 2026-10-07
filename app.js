@@ -297,11 +297,60 @@ function computeStopAndGoTrajectory(entity) {
   };
 }
 
+function computeCircularTrajectory(entity) {
+  const delay = parseFloat(entity.h) || 0;
+  const startYNorm = parseFloat(entity.args[0]);
+  const normY = isNaN(startYNorm) ? 0.5 : Math.max(0, Math.min(1, startYNorm));
+  const y0 = VIEW_H * (1 - normY);
+
+  const specificArgs = entity.args.slice(COMMON.length).map(parseFloat);
+  if (specificArgs.length < 4 || specificArgs.some(isNaN)) {
+    return null;
+  }
+
+  const hSpeed = -Math.abs(specificArgs[0]);
+  const radius = specificArgs[1];
+  const angularSpeed = specificArgs[2];
+  let angle = specificArgs[3];
+
+  let x = VIEW_W;
+  let y = y0;
+  const pts = [[x, y]];
+  let tEnd = 0;
+
+  for (let t = DT; t <= T_MAX; t += DT) {
+    angle += angularSpeed * DT;
+
+    const vxCircle = -Math.sin(angle) * (radius * angularSpeed);
+    const vyCircle = Math.cos(angle) * (radius * angularSpeed);
+
+    const vx = hSpeed + vxCircle;
+    // Invertito di segno per l'asse Y del canvas (y va verso il basso)
+    const vy = -vyCircle;
+
+    x += vx * DT;
+    y += vy * DT;
+    pts.push([x, y]);
+    tEnd = t;
+
+    if (pts.length > 1 && x < -Math.abs(radius) - 50) break;
+  }
+
+  return {
+    type: entity.type || "Entity",
+    delay,
+    tEnd,
+    totalSpan: delay + tEnd,
+    pts
+  };
+}
+
 // Funzione generica per calcolare la traiettoria di qualsiasi mover supportato
 function computeTrajectory(entity) {
   if (entity.mover === "Lissajous") return computeLissajousTrajectory(entity);
   if (entity.mover === "Swoop") return computeSwoopTrajectory(entity);
   if (entity.mover === "StopAndGo") return computeStopAndGoTrajectory(entity);
+  if (entity.mover === "Circular") return computeCircularTrajectory(entity);
   return null;
 }
 
@@ -364,17 +413,21 @@ $("btnSimEntity").onclick = () => {
 function updateWavePreview() {
   t0 = performance.now();
   const note = $("pvNote");
-  const supportedMovers = ["Lissajous", "Swoop", "StopAndGo"];
-  const activeEntities = state.entities.filter(e => e.on && supportedMovers.includes(e.mover));
+  const activeEntities = state.entities.filter(e => e.on);
   if (!activeEntities.length) {
     waveTrajectories = [];
-    note.textContent = "Nessuna entità supportata abilitata nella wave.";
+    note.textContent = "Nessuna entità abilitata nella wave.";
     return;
   }
 
   waveTrajectories = activeEntities
     .map(computeTrajectory)
     .filter(Boolean);
+
+  if (!waveTrajectories.length) {
+    note.textContent = "Nessuna traiettoria valida calcolata (controlla i parametri delle entità).";
+    return;
+  }
 
   waveMaxDuration = Math.max(0, ...waveTrajectories.map(tr => tr.totalSpan));
   const totalWaveDur = parseFloat(state.duration) || waveMaxDuration;
@@ -389,29 +442,23 @@ function updatePreview() {
   const note = $("pvNote");
   pv = null; 
   t0 = performance.now();
-  const supportedMovers = ["Lissajous", "Swoop", "StopAndGo"];
-  const mover = $("mover").value;
-  if (!supportedMovers.includes(mover)) {
-    note.textContent = `La preview è disponibile per: ${supportedMovers.join(", ")}.`;
-    return;
-  }
   readDraft();
   const currentDraft = {
     type: $("type").value,
     h: $("h").value,
-    mover: mover,
+    mover: $("mover").value,
     args: draftArgs
   };
   const tr = computeTrajectory(currentDraft);
   if (!tr) {
-    note.textContent = "Compila i parametri richiesti per vedere la preview.";
+    note.textContent = "Fill all required fields to see the preview.";
     return;
   }
   pv = tr;
   const left = tr.tEnd >= T_MAX - DT;
   note.textContent = left 
-    ? `L'entità non esce dallo schermo entro ${T_MAX} s.` 
-    : `Attraversa lo schermo in circa ${tr.tEnd.toFixed(1)} s (spawn delay: ${tr.delay} s).`;
+    ? `The entity does not exit the screen within ${T_MAX} s.` 
+    : `Traverses the screen in approximately ${tr.tEnd.toFixed(1)} s (spawn delay: ${tr.delay} s).`;
 }
 
 function frame(now) {
