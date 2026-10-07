@@ -34,3 +34,7 @@ pre{background:var(--code);color:var(--code-ink);padding:12px;border-radius:6px;
 .top{position:sticky;top:16px}
 canvas{width:100%;height:auto;display:block;border:1px solid var(--line);border-radius:6px;background:var(--bg)}
 .note{font-size:13px;color:var(--mute);margin-top:8px;min-height:18px}
+body.drag-over {
+  outline: 3px dashed var(--acc, #3b82f6);
+  outline-offset: -3px;
+}

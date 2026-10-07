@@ -160,22 +160,56 @@ $("down").onclick = () => {
 };
 $("copy").onclick = () => navigator.clipboard?.writeText($("out").textContent);
 $("up").onclick = () => $("file").click();
-$("file").onchange = ev => {
-  const f = ev.target.files[0]; if(!f) return;
+function loadFile(f) {
+  if (!f) return;
   const r = new FileReader();
   r.onload = () => {
-    try{
+    try {
       let d = JSON.parse(r.result);
-      if(Array.isArray(d)) d = d[0];
-      if(!d || !Array.isArray(d.entities)) throw new Error("Missing entities array.");
-      state = {id:String(d.id ?? ""), meta:String(d.meta ?? ""), duration:String(d.duration ?? ""), entities:d.entities.map(parse)};
-      $("id").value = state.id; $("meta").value = state.meta; $("dur").value = state.duration;
-      stopEdit(); renderAll();
-    }catch(e){ alert("Invalid file: " + e.message); }
+      if (Array.isArray(d)) d = d[0];
+      if (!d || !Array.isArray(d.entities)) throw new Error("Missing entities array.");
+      state = {
+        id: String(d.id ?? ""),
+        meta: String(d.meta ?? ""),
+        duration: String(d.duration ?? ""),
+        entities: d.entities.map(parse)
+      };
+      $("id").value = state.id;
+      $("meta").value = state.meta;
+      $("dur").value = state.duration;
+      stopEdit();
+      renderAll();
+      if (previewMode === "wave") updateWavePreview();
+    } catch(e) {
+      alert("Invalid file: " + e.message);
+    }
     $("file").value = "";
   };
   r.readAsText(f);
-};
+}
+
+$("up").onclick = () => $("file").click();
+$("file").onchange = ev => loadFile(ev.target.files[0]);
+
+// ---------- Drag & Drop JSON ----------
+window.addEventListener("dragover", ev => {
+  ev.preventDefault();
+  ev.dataTransfer.dropEffect = "copy";
+  document.body.classList.add("drag-over");
+});
+
+window.addEventListener("dragleave", ev => {
+  if (ev.relatedTarget === null) {
+    document.body.classList.remove("drag-over");
+  }
+});
+
+window.addEventListener("drop", ev => {
+  ev.preventDefault();
+  document.body.classList.remove("drag-over");
+  const f = ev.dataTransfer.files[0];
+  if (f) loadFile(f);
+});
 $("reset").onclick = () => {
   if(state.entities.length && !confirm("Discard the current work?")) return;
   state = {id:"", meta:"", duration:"", entities:[]};
