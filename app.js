@@ -178,8 +178,9 @@ function updatePreview(){
   const pts = []; let tEnd = 0;
   for(let t = 0; t <= T_MAX; t += DT){
     const p = pos(t); pts.push(p); tEnd = t;
-    if(p[0] < -Math.abs(ax) - 20) break;
+    if(pts.length > 1 && p[0] < -Math.abs(ax) - 20) break;
   }
+  if(pts.length === 0) return;
   pv = {pts, tEnd, ay};
   const left = tEnd >= T_MAX - DT;
   note.textContent = left ? `The entity does not leave the screen within ${T_MAX} s.` : `Crosses the screen in about ${tEnd.toFixed(1)} s.`;
@@ -192,20 +193,23 @@ function frame(now){
   ctx.clearRect(0, 0, cv.width, cv.height);
   ctx.strokeStyle = css.getPropertyValue("--line"); ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(0, cv.height/2); ctx.lineTo(cv.width, cv.height/2); ctx.stroke();
-  if(pv){
+  
+  if(pv && pv.pts.length){
     const span = pv.tEnd + PAUSE;
     const t = reduceMotion ? pv.tEnd : Math.min(((now - t0)/1000) % span, pv.tEnd);
-    const n = Math.min(pv.pts.length - 1, Math.round(t / DT));
+    const n = Math.max(0, Math.min(pv.pts.length - 1, Math.round(t / DT)));
     ctx.lineWidth = 2; ctx.lineJoin = "round";
     ctx.strokeStyle = css.getPropertyValue("--line");
     ctx.beginPath(); pv.pts.forEach((p,i) => i ? ctx.lineTo(p[0]*k, p[1]*k) : ctx.moveTo(p[0]*k, p[1]*k)); ctx.stroke();
     ctx.strokeStyle = css.getPropertyValue("--acc");
-    ctx.beginPath(); for(let i = 0; i <= n; i++){ const p = pv.pts[i]; i ? ctx.lineTo(p[0]*k, p[1]*k) : ctx.moveTo(p[0]*k, p[1]*k); } ctx.stroke();
+    ctx.beginPath(); for(let i = 0; i <= n; i++){ const p = pv.pts[i]; if(p) { i ? ctx.lineTo(p[0]*k, p[1]*k) : ctx.moveTo(p[0]*k, p[1]*k); } } ctx.stroke();
     const p = pv.pts[n];
-    ctx.fillStyle = css.getPropertyValue("--acc");
-    ctx.beginPath(); ctx.arc(p[0]*k, p[1]*k, 8*k, 0, 7); ctx.fill();
-    ctx.fillStyle = css.getPropertyValue("--mute"); ctx.font = `${14*k}px sans-serif`;
-    ctx.fillText(`t = ${(n*DT).toFixed(1)} s`, 10*k, 20*k);
+    if(p){
+      ctx.fillStyle = css.getPropertyValue("--acc");
+      ctx.beginPath(); ctx.arc(p[0]*k, p[1]*k, 8*k, 0, 7); ctx.fill();
+      ctx.fillStyle = css.getPropertyValue("--mute"); ctx.font = `${14*k}px sans-serif`;
+      ctx.fillText(`t = ${(n*DT).toFixed(1)} s`, 10*k, 20*k);
+    }
   }
   requestAnimationFrame(frame);
 }
