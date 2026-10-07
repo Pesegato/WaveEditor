@@ -1,20 +1,3 @@
-const ENTITY_TYPES = [
-  "Slug_soldier",
-  "SmartSlug",
-  "Slug_shell",
-  "Slug_redshell",
-  "Slug_captain",
-  "Slug_general",
-  "BOSS1GREEN",
-  "BOSS1YELLOW",
-  "BOSS1RED",
-  "Pignata_NORMAL",
-  "Pignata_CYAN",
-  "Pignata_RED",
-  "Pignata_PURPLE",
-  "Headcrab",
-  "Slug_egg"
-];
 // Parameters per movement type: edit here to add or change movements.
 const MOVERS = {
   Swoop:     ["enterSpeed","swoopSpeed","diveDelay","diveDuration"],
@@ -35,6 +18,37 @@ function parse(s){
   const p = String(s).split(",").map(x => x.trim());
   return {type:p[0]||"", h:p[1]||"", on:(p[2]||"true").toLowerCase()==="true", mover:p[3]||Object.keys(MOVERS)[0], args:p.slice(4)};
 }
+
+const DEFAULT_ENTITY_TYPES = [
+  "Slug_soldier", "SmartSlug", "Slug_shell", "Slug_redshell",
+  "Slug_captain", "Slug_general", "BOSS1GREEN", "BOSS1YELLOW",
+  "BOSS1RED", "Pignata_NORMAL", "Pignata_CYAN", "Pignata_RED",
+  "Pignata_PURPLE", "Headcrab", "Slug_egg"
+];
+
+function loadEntityTypes() {
+  try {
+    const raw = localStorage.getItem("shmup_entity_types");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch(e) {
+    console.warn("Impossibile caricare tipi da localStorage:", e);
+  }
+  return DEFAULT_ENTITY_TYPES;
+}
+
+let ENTITY_TYPES = loadEntityTypes();
+
+// Ascolta in tempo reale se EntityEditor aggiorna la lista mentre WaveEditor è aperto
+window.addEventListener("storage", ev => {
+  if (ev.key === "shmup_entity_types") {
+    ENTITY_TYPES = loadEntityTypes();
+    $("type").innerHTML = ENTITY_TYPES.map(t => `<option value="${t}">${t}</option>`).join("");
+  }
+});
+
 
 function init() {
   $("type").innerHTML = ENTITY_TYPES.map(t => `<option value="${t}">${t}</option>`).join("");
@@ -610,6 +624,39 @@ function frame(now) {
 
   requestAnimationFrame(frame);
 }
+
+function sendWaveToLevelEditor() {
+  const currentWave = toJSON();
+  if (!currentWave.id) {
+    alert("Assegna un ID alla wave prima di inviarla.");
+    return;
+  }
+
+  // Carica le wave già esistenti in memoria
+  let waves = [];
+  try {
+    const raw = localStorage.getItem("shmup_waves");
+    if (raw) waves = JSON.parse(raw) || [];
+  } catch(e) {}
+
+  // Aggiorna la wave se ha lo stesso ID, altrimenti aggiungila
+  const idx = waves.findIndex(w => w.id === currentWave.id);
+  if (idx >= 0) {
+    waves[idx] = currentWave;
+  } else {
+    waves.push(currentWave);
+  }
+
+  // Salva l'array di wave e l'ultima wave corrente
+  localStorage.setItem("shmup_waves", JSON.stringify(waves));
+  localStorage.setItem("shmup_last_wave", JSON.stringify(currentWave));
+
+  // Opzionale: chiedi se aprire il LevelEditor
+  if (confirm(`Wave "${currentWave.id}" salvata nel pacchetto (${waves.length} wave totali). Vuoi aprire il LevelEditor?`)) {
+    window.open("https://pesegato.github.io/LevelEditor/", "_blank");
+  }
+}
+
 // Chiama renderAll e avvia il loop
 init();
 updatePreview();
