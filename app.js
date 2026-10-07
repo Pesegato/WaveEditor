@@ -217,10 +217,91 @@ function computeSwoopTrajectory(entity) {
   };
 }
 
+function computeStopAndGoTrajectory(entity) {
+  const delay = parseFloat(entity.h) || 0;
+  const startYNorm = parseFloat(entity.args[0]);
+  const normY = isNaN(startYNorm) ? 0.5 : Math.max(0, Math.min(1, startYNorm));
+  const y0 = VIEW_H * (1 - normY);
+
+  const specificArgs = entity.args.slice(COMMON.length).map(parseFloat);
+  if (specificArgs.length < 4 || specificArgs.some(isNaN)) {
+    return null;
+  }
+
+  const enterSpeed = -Math.abs(specificArgs[0]);
+  const enterDuration = Math.max(0.01, specificArgs[1]);
+  const hoverDuration = Math.max(0, specificArgs[2]);
+  const retreatSpeed = specificArgs[3];
+
+  let x = VIEW_W;
+  let y = y0;
+  const pts = [[x, y]];
+  let tEnd = 0;
+
+  let currentPhase = "ENTER";
+  let phaseTimer = 0;
+  let bobbingTimer = 0;
+
+  for (let t = DT; t <= T_MAX; t += DT) {
+    phaseTimer += DT;
+    let vx = 0;
+    let vy = 0;
+
+    switch (currentPhase) {
+      case "ENTER": {
+        const tEnter = Math.min(1.0, phaseTimer / enterDuration);
+        vx = enterSpeed * (1.0 - tEnter);
+        vy = 0;
+        if (phaseTimer >= enterDuration) {
+          currentPhase = "HOVER";
+          phaseTimer = 0;
+        }
+        break;
+      }
+      case "HOVER": {
+        bobbingTimer += DT * 4.0;
+        vx = 0;
+        // In Java vy è positivo verso l'alto; nel canvas verso il basso, invertiamo il segno
+        vy = -Math.cos(bobbingTimer) * 40.0;
+        if (phaseTimer >= hoverDuration) {
+          currentPhase = "RETREAT";
+          phaseTimer = 0;
+        }
+        break;
+      }
+      case "RETREAT": {
+        const tRetreat = Math.min(1.0, phaseTimer * 2.0);
+        vx = -retreatSpeed * tRetreat;
+        vy = 0;
+        break;
+      }
+    }
+
+    x += vx * DT;
+    y += vy * DT;
+    pts.push([x, y]);
+    tEnd = t;
+
+    // Se l'entità è in fase RETREAT ed esce dallo schermo a sinistra o a destra
+    if (currentPhase === "RETREAT" && (x < -50 || x > VIEW_W + 50)) {
+      break;
+    }
+  }
+
+  return {
+    type: entity.type || "Entity",
+    delay,
+    tEnd,
+    totalSpan: delay + tEnd,
+    pts
+  };
+}
+
 // Funzione generica per calcolare la traiettoria di qualsiasi mover supportato
 function computeTrajectory(entity) {
   if (entity.mover === "Lissajous") return computeLissajousTrajectory(entity);
   if (entity.mover === "Swoop") return computeSwoopTrajectory(entity);
+  if (entity.mover === "StopAndGo") return computeStopAndGoTrajectory(entity);
   return null;
 }
 
@@ -283,11 +364,11 @@ $("btnSimEntity").onclick = () => {
 function updateWavePreview() {
   t0 = performance.now();
   const note = $("pvNote");
-  // Supporta ora sia Lissajous che Swoop
-  const activeEntities = state.entities.filter(e => e.on && (e.mover === "Lissajous" || e.mover === "Swoop"));
+  const supportedMovers = ["Lissajous", "Swoop", "StopAndGo"];
+  const activeEntities = state.entities.filter(e => e.on && supportedMovers.includes(e.mover));
   if (!activeEntities.length) {
     waveTrajectories = [];
-    note.textContent = "Nessuna entità supportata (Lissajous o Swoop) abilitata nella wave.";
+    note.textContent = "Nessuna entità supportata abilitata nella wave.";
     return;
   }
 
@@ -308,9 +389,10 @@ function updatePreview() {
   const note = $("pvNote");
   pv = null; 
   t0 = performance.now();
+  const supportedMovers = ["Lissajous", "Swoop", "StopAndGo"];
   const mover = $("mover").value;
-  if (mover !== "Lissajous" && mover !== "Swoop") {
-    note.textContent = "La preview è disponibile per Lissajous e Swoop.";
+  if (!supportedMovers.includes(mover)) {
+    note.textContent = `La preview è disponibile per: ${supportedMovers.join(", ")}.`;
     return;
   }
   readDraft();
