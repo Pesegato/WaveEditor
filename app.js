@@ -6,7 +6,9 @@ const MOVERS = {
   Lissajous: ["baseSpeedX","ampX","ampY","freq"]
 };
 // Parameters shared by all movements, placed before the specific ones (0.5 in the example).
-const COMMON = ["common"];
+const COMMON = ["startPosition"];
+// y0: 0 in basso => VIEW_H, 1 in alto => 0
+const y0 = VIEW_H * (1 - startPosNorm);
 const $ = id => document.getElementById(id);
 let state = {id:"", meta:"", duration:"", entities:[]};
 let editing = null;
@@ -160,58 +162,197 @@ $("reset").onclick = () => {
 const VIEW_W = 800, VIEW_H = 450, DT = 1/60, T_MAX = 20, PAUSE = 0.8;
 const cv = $("pv"), ctx = cv.getContext("2d");
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
-let pv = null, t0 = performance.now();
 
-// Inizializzazione dell'app
-init();
+function computeLissajousTrajectory(entity) {
+  const delay = parseFloat(entity.h) || 0;
+  const startYNorm = parseFloat(entity.args[0]);
+  const normY = isNaN(startYNorm) ? 0.5 : Math.max(0, Math.min(1, startYNorm));
+  const y0 = VIEW_H * (1 - normY);
 
-// Same math as LissajousMover: integrating the velocity gives
-// x = x0 - |base|*t + ampX*sin(f*t),  y = y0 + ampY*sin(2*f*t)
-function updatePreview(){
-  const note = $("pvNote");
-  pv = null; t0 = performance.now();
-  if($("mover").value !== "Lissajous"){ note.textContent = "Preview is only available for Lissajous."; return; }
-  const a = draftArgs.slice(COMMON.length).map(parseFloat);
-  if(a.length < 4 || a.some(isNaN)){ note.textContent = "Fill in the parameters to see the preview."; return; }
-  const bx = -Math.abs(a[0]), ax = a[1], ay = a[2], f = a[3];
-  const pos = t => [VIEW_W + bx*t + ax*Math.sin(f*t), VIEW_H/2 + ay*Math.sin(2*f*t)];
-  const pts = []; let tEnd = 0;
-  for(let t = 0; t <= T_MAX; t += DT){
-    const p = pos(t); pts.push(p); tEnd = t;
-    if(pts.length > 1 && p[0] < -Math.abs(ax) - 20) break;
+  const specificArgs = entity.args.slice(COMMON.length).map(parseFloat);
+  if (specificArgs.length < 4 || specificArgs.some(isNaN)) return null;
+
+  const bx = -Math.abs(specificArgs[0]);
+  const ax = specificArgs[1];
+  const ay = specificArgs[2];
+  const f = specificArgs[3];
+
+  const pos = t => [
+    VIEW_W + bx * t + ax * Math.sin(f * t),
+    y0 + ay * Math.sin(2 * f * t)
+  ];
+
+  const pts = [];
+  let tEnd = 0;
+  for (let t = 0; t <= T_MAX; t += DT) {
+    const p = pos(t);
+    pts.push(p);
+    tEnd = t;
+    if (pts.length > 1 && p[0] < -Math.abs(ax) - 20) break;
   }
-  if(pts.length === 0) return;
-  pv = {pts, tEnd, ay};
-  const left = tEnd >= T_MAX - DT;
-  note.textContent = left ? `The entity does not leave the screen within ${T_MAX} s.` : `Crosses the screen in about ${tEnd.toFixed(1)} s.`;
-  if(Math.abs(ay) > VIEW_H/2) note.textContent += " It leaves the vertical edges.";
+
+  return {
+    type: entity.type || "Entity",
+    delay,
+    tEnd,
+    totalSpan: delay + tEnd,
+    pts
+  };
 }
 
-function frame(now){
+let previewMode = "single"; // "single" o "wave"
+let waveTrajectories = [];
+let waveMaxDuration = 0;
+let pv = null, t0 = performance.now();
+
+$("btnSimWave").onclick = () => {
+  previewMode = "wave";
+  $("btnSimWave").classList.add("pri");
+  $("btnSimEntity").classList.remove("pri");
+  updateWavePreview();
+};
+
+$("btnSimEntity").onclick = () => {
+  previewMode = "single";
+  $("btnSimEntity").classList.add("pri");
+  $("btnSimWave").classList.remove("pri");
+  updatePreview();
+};
+
+function updateWavePreview() {
+  t0 = performance.now();
+  const note = $("pvNote");
+  const activeEntities = state.entities.filter(e => e.on && e.mover === "Lissajous");
+  if (!activeEntities.length) {
+    waveTrajectories = [];
+    note.textContent = "Nessuna entità Lissajous abilitata nella wave.";
+    return;
+  }
+
+  waveTrajectories = activeEntities
+    .map(computeLissajousTrajectory)
+    .filter(Boolean);
+
+  waveMaxDuration = Math.max(0, ...waveTrajectories.map(tr => tr.totalSpan));
+  const totalWaveDur = parseFloat(state.duration) || waveMaxDuration;
+  note.textContent = `Simulazione wave: ${waveTrajectories.length} entità simulate (durata: ${waveMaxDuration.toFixed(1)}s, wave dur: ${totalWaveDur}s).`;
+}
+
+function updatePreview() {
+  if (previewMode === "wave") {
+    updateWavePreview();
+    return;
+  }
+  const note = $("pvNote");
+  pv = null; 
+  t0 = performance.now();
+  if ($("mover").value !== "Lissajous") {
+    note.textContent = "La preview è disponibile solo per Lissajous.";
+    return;
+  }
+  readDraft();
+  const currentDraft = {
+    type: $("type").value,
+    h: $("h").value,
+    args: draftArgs
+  };
+  const tr = computeLissajousTrajectory(currentDraft);
+  if (!tr) {
+    note.textContent = "Compila i parametri (startPosition 0..1, velocità, ampiezze, freq) per vedere la preview.";
+    return;
+  }
+  pv = tr;
+  const left = tr.tEnd >= T_MAX - DT;
+  note.textContent = left 
+    ? `L'entità non esce dallo schermo entro ${T_MAX} s.` 
+    : `Attraversa lo schermo in circa ${tr.tEnd.toFixed(1)} s (spawn delay: ${tr.delay} s).`;
+}
+
+function frame(now) {
   const css = getComputedStyle(document.documentElement);
   const k = cv.width / VIEW_W;
   ctx.clearRect(0, 0, cv.width, cv.height);
-  ctx.strokeStyle = css.getPropertyValue("--line"); ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(0, cv.height/2); ctx.lineTo(cv.width, cv.height/2); ctx.stroke();
-  
-  if(pv && pv.pts.length){
+
+  // Griglia / linea di mezzo di riferimento
+  ctx.strokeStyle = css.getPropertyValue("--line");
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(0, cv.height / 2);
+  ctx.lineTo(cv.width, cv.height / 2);
+  ctx.stroke();
+
+  if (previewMode === "single" && pv && pv.pts.length) {
     const span = pv.tEnd + PAUSE;
-    const t = reduceMotion ? pv.tEnd : Math.min(((now - t0)/1000) % span, pv.tEnd);
+    const t = reduceMotion ? pv.tEnd : Math.min(((now - t0) / 1000) % span, pv.tEnd);
     const n = Math.max(0, Math.min(pv.pts.length - 1, Math.round(t / DT)));
-    ctx.lineWidth = 2; ctx.lineJoin = "round";
+
+    // Traiettoria intera
+    ctx.lineWidth = 2;
     ctx.strokeStyle = css.getPropertyValue("--line");
-    ctx.beginPath(); pv.pts.forEach((p,i) => i ? ctx.lineTo(p[0]*k, p[1]*k) : ctx.moveTo(p[0]*k, p[1]*k)); ctx.stroke();
+    ctx.beginPath();
+    pv.pts.forEach((p, i) => i ? ctx.lineTo(p[0] * k, p[1] * k) : ctx.moveTo(p[0] * k, p[1] * k));
+    ctx.stroke();
+
+    // Traiettoria percorsa
     ctx.strokeStyle = css.getPropertyValue("--acc");
-    ctx.beginPath(); for(let i = 0; i <= n; i++){ const p = pv.pts[i]; if(p) { i ? ctx.lineTo(p[0]*k, p[1]*k) : ctx.moveTo(p[0]*k, p[1]*k); } } ctx.stroke();
-    const p = pv.pts[n];
-    if(p){
-      ctx.fillStyle = css.getPropertyValue("--acc");
-      ctx.beginPath(); ctx.arc(p[0]*k, p[1]*k, 8*k, 0, 7); ctx.fill();
-      ctx.fillStyle = css.getPropertyValue("--mute"); ctx.font = `${14*k}px sans-serif`;
-      ctx.fillText(`t = ${(n*DT).toFixed(1)} s`, 10*k, 20*k);
+    ctx.beginPath();
+    for (let i = 0; i <= n; i++) {
+      const p = pv.pts[i];
+      i ? ctx.lineTo(p[0] * k, p[1] * k) : ctx.moveTo(p[0] * k, p[1] * k);
     }
+    ctx.stroke();
+
+    // Entità (pallino)
+    const p = pv.pts[n];
+    if (p) {
+      ctx.fillStyle = css.getPropertyValue("--acc");
+      ctx.beginPath();
+      ctx.arc(p[0] * k, p[1] * k, 8 * k, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = css.getPropertyValue("--mute");
+      ctx.font = `${14 * k}px sans-serif`;
+      ctx.fillText(`t = ${(n * DT).toFixed(1)} s`, 10 * k, 20 * k);
+    }
+  } else if (previewMode === "wave" && waveTrajectories.length) {
+    const cycle = waveMaxDuration + PAUSE;
+    const elapsed = ((now - t0) / 1000) % cycle;
+
+    waveTrajectories.forEach((tr, idx) => {
+      // Traiettoria semi-trasparente
+      ctx.strokeStyle = css.getPropertyValue("--line");
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      tr.pts.forEach((p, i) => i ? ctx.lineTo(p[0] * k, p[1] * k) : ctx.moveTo(p[0] * k, p[1] * k));
+      ctx.stroke();
+
+      // L'entità è attiva solo se elapsed >= delay e tRelativo <= tEnd
+      if (elapsed >= tr.delay && (elapsed - tr.delay) <= tr.tEnd) {
+        const tRel = elapsed - tr.delay;
+        const n = Math.max(0, Math.min(tr.pts.length - 1, Math.round(tRel / DT)));
+        const p = tr.pts[n];
+        if (p) {
+          ctx.fillStyle = css.getPropertyValue("--acc");
+          ctx.beginPath();
+          ctx.arc(p[0] * k, p[1] * k, 7 * k, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Label tipo sopra l'entità
+          ctx.fillStyle = css.getPropertyValue("--mute");
+          ctx.font = `${11 * k}px sans-serif`;
+          ctx.fillText(tr.type, p[0] * k + 10 * k, p[1] * k - 5 * k);
+        }
+      }
+    });
+
+    ctx.fillStyle = css.getPropertyValue("--mute");
+    ctx.font = `${14 * k}px sans-serif`;
+    ctx.fillText(`Wave t = ${elapsed.toFixed(1)} s`, 10 * k, 20 * k);
   }
+
   requestAnimationFrame(frame);
 }
+
+// Chiama renderAll e avvia il loop
+init();
 updatePreview();
 requestAnimationFrame(frame);

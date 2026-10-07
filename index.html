@@ -1,66 +1,76 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Wave editor</title>
-<link rel="stylesheet" href="style.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Wave editor</title>
+  <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
-<header>
-  <h1>Wave editor</h1>
-  <div class="row" style="margin:0">
-    <button id="reset">New</button>
-    <button id="up">Load JSON</button>
-    <button id="down" class="pri">Download JSON</button>
-    <input id="file" type="file" accept=".json,application/json" hidden>
-  </div>
-</header>
-<main>
-  <div>
-    <section>
-      <h2>General data</h2>
-      <div class="grid meta">
-        <div><label for="id">ID</label><input id="id" type="text" placeholder="e.g. Gemini"></div>
-        <div><label for="meta">Meta</label><input id="meta" type="text" placeholder="e.g. easy"></div>
-        <div><label for="dur">Duration (s)</label><input id="dur" type="number" min="0" step="any"></div>
-      </div>
-    </section>
-    <section>
-      <h2 id="edTitle">New entity</h2>
-      <div class="grid">
-        <div><label for="type">Type</label><input id="type" type="text" list="types" placeholder="e.g. Slug_soldier"><datalist id="types"></datalist></div>
-        <div><label for="h">H</label><input id="h" type="number" step="any"></div>
-        <div class="chk"><input id="on" type="checkbox" checked><label for="on">Enabled</label></div>
-        <div><label for="mover">Movement</label><select id="mover"></select></div>
-      </div>
-      <div class="grid" id="args" style="margin-top:12px"></div>
-      <div class="msg" id="err" role="alert"></div>
-      <div class="row">
-        <button id="save" class="pri">Add</button>
-        <button id="cancel" hidden>Cancel edit</button>
-      </div>
-    </section>
-    <section>
-      <h2>Entities (<span id="count">0</span>)</h2>
-      <div id="list"></div>
-    </section>
-  </div>
-  <div>
-    <div class="top">
+  <header>
+    <h1>Wave editor</h1>
+    <div class="row" style="margin:0">
+      <button id="reset">New</button>
+      <button id="up">Load JSON</button>
+      <button id="down" class="pri">Download JSON</button>
+      <input id="file" type="file" accept=".json,application/json" hidden>
+    </div>
+  </header>
+  <main>
+    <div>
       <section>
-        <h2>Movement preview</h2>
-        <canvas id="pv" width="800" height="450" aria-label="Movement preview"></canvas>
-        <div class="note" id="pvNote"></div>
+        <h2>General data</h2>
+        <div class="grid meta">
+          <div><label for="id">ID</label><input id="id" type="text" placeholder="e.g. Gemini"></div>
+          <div><label for="meta">Meta</label><input id="meta" type="text" placeholder="e.g. easy"></div>
+          <div><label for="dur">Duration (s)</label><input id="dur" type="number" min="0" step="any"></div>
+        </div>
       </section>
       <section>
+        <h2 id="edTitle">New entity</h2>
+        <div class="grid">
+          <div><label for="type">Type</label><input id="type" type="text" list="types"
+              placeholder="e.g. Slug_soldier"><datalist id="types"></datalist></div>
+          <div><label for="h">Spawn delay (s)</label><input id="h" type="number" step="any" min="0" placeholder="0">
+          </div>
+          <div class="chk"><input id="on" type="checkbox" checked><label for="on">Enabled</label></div>
+          <div><label for="mover">Movement</label><select id="mover"></select></div>
+        </div>
+        <div class="grid" id="args" style="margin-top:12px"></div>
+        <div class="msg" id="err" role="alert"></div>
+        <div class="row">
+          <button id="save" class="pri">Add</button>
+          <button id="cancel" hidden>Cancel edit</button>
+        </div>
+      </section>
+      <section>
+        <h2>Entities (<span id="count">0</span>)</h2>
+        <div id="list"></div>
+      </section>
+    </div>
+    <div>
+      <div class="top">
+        <section>
+          <div class="row" style="justify-content:space-between; align-items:center;">
+            <h2>Preview</h2>
+            <div class="row" style="margin:0">
+              <button id="btnSimWave" class="sm">Simulte Wave</button>
+              <button id="btnSimEntity" class="sm pri">Simulte Single</button>
+            </div>
+          </div>
+          <canvas id="pv" width="800" height="450" aria-label="Movement preview"></canvas>
+          <div class="note" id="pvNote"></div>
+        </section>
         <h2>JSON preview</h2>
         <pre id="out"></pre>
         <div class="row"><button id="copy">Copy</button></div>
-      </section>
+        </section>
+      </div>
     </div>
-  </div>
-</main>
-<script src="app.js"></script>
+  </main>
+  <script src="app.js"></script>
 </body>
+
 </html>
