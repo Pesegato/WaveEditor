@@ -1,3 +1,20 @@
+const ENTITY_TYPES = [
+  "Slug_soldier",
+  "SmartSlug",
+  "Slug_shell",
+  "Slug_redshell",
+  "Slug_captain",
+  "Slug_general",
+  "BOSS1GREEN",
+  "BOSS1YELLOW",
+  "BOSS1RED",
+  "Pignata_NORMAL",
+  "Pignata_CYAN",
+  "Pignata_RED",
+  "Pignata_PURPLE",
+  "Headcrab",
+  "Slug_egg"
+];
 // Parameters per movement type: edit here to add or change movements.
 const MOVERS = {
   Swoop:     ["enterSpeed","swoopSpeed","diveDelay","diveDuration"],
@@ -12,16 +29,19 @@ let state = {id:"", meta:"", duration:"", entities:[]};
 let editing = null;
 let draftArgs = [];
 
-const blank = () => ({type:"", h:"", on:true, mover:Object.keys(MOVERS)[0], args:[]});
+const blank = () => ({ type: ENTITY_TYPES[0], h: "0.5", on: true, mover: Object.keys(MOVERS)[0], args: [] });
 const ser = e => [e.type, e.h, e.on, e.mover, ...e.args].join(",");
 function parse(s){
   const p = String(s).split(",").map(x => x.trim());
   return {type:p[0]||"", h:p[1]||"", on:(p[2]||"true").toLowerCase()==="true", mover:p[3]||Object.keys(MOVERS)[0], args:p.slice(4)};
 }
 
-function init(){
+function init() {
+  $("type").innerHTML = ENTITY_TYPES.map(t => `<option value="${t}">${t}</option>`).join("");
   $("mover").innerHTML = Object.keys(MOVERS).map(m => `<option>${m}</option>`).join("");
-  draftArgs = []; renderArgs(); renderAll();
+  draftArgs = [];
+  renderArgs();
+  renderAll();
 }
 
 function renderArgs(){
@@ -35,6 +55,7 @@ function readDraft(){
   draftArgs = [...document.querySelectorAll("#args input")].map(i => i.value.trim());
 }
 
+$("type").addEventListener("change", () => { updatePreview(); });
 $("mover").addEventListener("change", () => { readDraft(); renderArgs(); });
 $("args").addEventListener("input", () => { readDraft(); updatePreview(); });
 
@@ -60,11 +81,19 @@ $("save").onclick = () => {
 };
 $("cancel").onclick = () => { stopEdit(); };
 
-function loadForm(e){
-  $("type").value = e.type; $("h").value = e.h; $("on").checked = e.on; $("mover").value = e.mover;
-  if(!MOVERS[e.mover]) $("mover").insertAdjacentHTML("beforeend", `<option>${e.mover}</option>`), $("mover").value = e.mover;
-  draftArgs = e.args.slice(); renderArgs();
+function loadForm(e) {
+  if (!ENTITY_TYPES.includes(e.type) && e.type) {
+    $("type").insertAdjacentHTML("beforeend", `<option value="${esc(e.type)}">${esc(e.type)}</option>`);
+  }
+  $("type").value = e.type || ENTITY_TYPES[0];
+  $("h").value = e.h;
+  $("on").checked = e.on;
+  $("mover").value = e.mover;
+  if (!MOVERS[e.mover]) $("mover").insertAdjacentHTML("beforeend", `<option>${e.mover}</option>`), $("mover").value = e.mover;
+  draftArgs = e.args.slice();
+  renderArgs();
 }
+
 function startEdit(i){
   editing = i; loadForm(state.entities[i]);
   $("edTitle").textContent = `Edit entity ${i+1}`;
@@ -113,10 +142,8 @@ function esc(s){ return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt
 function toJSON(){
   return {id:state.id, meta:state.meta, duration:String(state.duration), entities:state.entities.map(ser)};
 }
-function renderOut(){
+function renderOut() {
   $("out").textContent = JSON.stringify(toJSON(), null, 4);
-  const types = [...new Set(state.entities.map(e => e.type))];
-  $("types").innerHTML = types.map(t => `<option value="${esc(t)}">`).join("");
 }
 function renderAll(){ renderList(); renderOut(); }
 
