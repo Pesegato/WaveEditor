@@ -1,6 +1,6 @@
 // Parameters per movement type: edit here to add or change movements.
 const MOVERS = {
-  Swoop:     ["enterSpeed","swoopSpeed","diveDelay"],
+  Swoop:     ["enterSpeed","swoopSpeed","diveDelay","diveDuration"],
   StopAndGo: ["enterSpeed","enterDuration","hoverDuration","retreatSpeed"],
   Circular:  ["hSpeed","radius","angularSpeed","startAngle"],
   Lissajous: ["baseSpeedX","ampX","ampY","freq"]
@@ -161,6 +161,69 @@ const VIEW_W = 800, VIEW_H = 450, DT = 1/60, T_MAX = 20, PAUSE = 0.8;
 const cv = $("pv"), ctx = cv.getContext("2d");
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+function computeSwoopTrajectory(entity) {
+  const delay = parseFloat(entity.h) || 0;
+  const startYNorm = parseFloat(entity.args[0]);
+  const normY = isNaN(startYNorm) ? 0.5 : Math.max(0, Math.min(1, startYNorm));
+  const y0 = VIEW_H * (1 - normY);
+
+  const specificArgs = entity.args.slice(COMMON.length).map(parseFloat);
+  if (specificArgs.length < 3 || isNaN(specificArgs[0]) || isNaN(specificArgs[1]) || isNaN(specificArgs[2])) {
+    return null;
+  }
+
+  const enterSpeed = -Math.abs(specificArgs[0]);
+  const swoopSpeed = Math.abs(specificArgs[1]);
+  const diveDelay = specificArgs[2];
+  const diveDuration = (!isNaN(specificArgs[3]) && specificArgs[3] > 0) ? specificArgs[3] : 1.2;
+
+  let x = VIEW_W;
+  let y = y0;
+  const pts = [[x, y]];
+  let tEnd = 0;
+
+  for (let t = DT; t <= T_MAX; t += DT) {
+    let vx = 0;
+    let vy = 0;
+
+    if (t < diveDelay) {
+      vx = enterSpeed;
+      vy = 0;
+    } else if (t < diveDelay + diveDuration) {
+      const diveProgress = (t - diveDelay) / diveDuration;
+      const sinFactor = Math.sin(diveProgress * Math.PI);
+      vx = enterSpeed - (sinFactor * swoopSpeed * 0.5);
+      // Nel canvas y cresce verso il basso, quindi il tuffo verso il basso incrementa y (+vy)
+      vy = sinFactor * swoopSpeed;
+    } else {
+      vx = enterSpeed * 1.5;
+      vy = 0;
+    }
+
+    x += vx * DT;
+    y += vy * DT;
+    pts.push([x, y]);
+    tEnd = t;
+
+    if (pts.length > 1 && x < -50) break;
+  }
+
+  return {
+    type: entity.type || "Entity",
+    delay,
+    tEnd,
+    totalSpan: delay + tEnd,
+    pts
+  };
+}
+
+// Funzione generica per calcolare la traiettoria di qualsiasi mover supportato
+function computeTrajectory(entity) {
+  if (entity.mover === "Lissajous") return computeLissajousTrajectory(entity);
+  if (entity.mover === "Swoop") return computeSwoopTrajectory(entity);
+  return null;
+}
+
 function computeLissajousTrajectory(entity) {
   const delay = parseFloat(entity.h) || 0;
   const startYNorm = parseFloat(entity.args[0]);
@@ -220,15 +283,16 @@ $("btnSimEntity").onclick = () => {
 function updateWavePreview() {
   t0 = performance.now();
   const note = $("pvNote");
-  const activeEntities = state.entities.filter(e => e.on && e.mover === "Lissajous");
+  // Supporta ora sia Lissajous che Swoop
+  const activeEntities = state.entities.filter(e => e.on && (e.mover === "Lissajous" || e.mover === "Swoop"));
   if (!activeEntities.length) {
     waveTrajectories = [];
-    note.textContent = "Nessuna entità Lissajous abilitata nella wave.";
+    note.textContent = "Nessuna entità supportata (Lissajous o Swoop) abilitata nella wave.";
     return;
   }
 
   waveTrajectories = activeEntities
-    .map(computeLissajousTrajectory)
+    .map(computeTrajectory)
     .filter(Boolean);
 
   waveMaxDuration = Math.max(0, ...waveTrajectories.map(tr => tr.totalSpan));
@@ -244,19 +308,21 @@ function updatePreview() {
   const note = $("pvNote");
   pv = null; 
   t0 = performance.now();
-  if ($("mover").value !== "Lissajous") {
-    note.textContent = "La preview è disponibile solo per Lissajous.";
+  const mover = $("mover").value;
+  if (mover !== "Lissajous" && mover !== "Swoop") {
+    note.textContent = "La preview è disponibile per Lissajous e Swoop.";
     return;
   }
   readDraft();
   const currentDraft = {
     type: $("type").value,
     h: $("h").value,
+    mover: mover,
     args: draftArgs
   };
-  const tr = computeLissajousTrajectory(currentDraft);
+  const tr = computeTrajectory(currentDraft);
   if (!tr) {
-    note.textContent = "Compila i parametri (startPosition 0..1, velocità, ampiezze, freq) per vedere la preview.";
+    note.textContent = "Compila i parametri richiesti per vedere la preview.";
     return;
   }
   pv = tr;
