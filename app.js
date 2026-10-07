@@ -552,29 +552,38 @@ function frame(now) {
   const k = cv.width / VIEW_W;
   ctx.clearRect(0, 0, cv.width, cv.height);
 
-  // Linea orizzontale di centro schermo
-  ctx.strokeStyle = css.getPropertyValue("--line");
+  const enemyColor = css.getPropertyValue("--enemy").trim() || "#4be817";
+  const lineColor = css.getPropertyValue("--line").trim() || "#3b2059";
+  const muteColor = css.getPropertyValue("--mute").trim() || "#a797be";
+
+  // Linea guida di centro schermo
+  ctx.strokeStyle = lineColor;
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(0, cv.height / 2);
   ctx.lineTo(cv.width, cv.height / 2);
   ctx.stroke();
 
+  // Reset glow per le linee generali
+  ctx.shadowBlur = 0;
+
   if (previewMode === "single" && pv && pv.pts.length) {
     const span = pv.tEnd + PAUSE;
     const t = reduceMotion ? pv.tEnd : Math.min(((now - t0) / 1000) % span, pv.tEnd);
     const n = Math.max(0, Math.min(pv.pts.length - 1, Math.round(t / DT)));
 
-    // Traiettoria intera (spessore fisso a 2px)
+    // Traiettoria intera (linea viola sottile di riferimento)
     ctx.lineWidth = 2;
     ctx.lineJoin = "round";
-    ctx.strokeStyle = css.getPropertyValue("--line");
+    ctx.strokeStyle = lineColor;
     ctx.beginPath();
     pv.pts.forEach((p, i) => i ? ctx.lineTo(p[0] * k, p[1] * k) : ctx.moveTo(p[0] * k, p[1] * k));
     ctx.stroke();
 
-    // Traiettoria percorsa
-    ctx.strokeStyle = css.getPropertyValue("--acc");
+    // Traiettoria percorsa (verde acido con glow)
+    ctx.shadowColor = enemyColor;
+    ctx.shadowBlur = 8;
+    ctx.strokeStyle = enemyColor;
     ctx.beginPath();
     for (let i = 0; i <= n; i++) {
       const p = pv.pts[i];
@@ -582,16 +591,18 @@ function frame(now) {
     }
     ctx.stroke();
 
-    // Pallino entità (raggio fisso a 7px anziché 8*k)
+    // Nemico (pallino verde acido brillante)
     const p = pv.pts[n];
     if (p) {
-      ctx.fillStyle = css.getPropertyValue("--acc");
+      ctx.fillStyle = enemyColor;
+      ctx.shadowBlur = 12;
       ctx.beginPath();
       ctx.arc(p[0] * k, p[1] * k, 7, 0, Math.PI * 2);
       ctx.fill();
 
-      // Testo del timer (font fisso a 13px)
-      ctx.fillStyle = css.getPropertyValue("--mute");
+      // Testo timer
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = muteColor;
       ctx.font = "13px sans-serif";
       ctx.fillText(`t = ${(n * DT).toFixed(1)} s`, 12, 22);
     }
@@ -600,34 +611,40 @@ function frame(now) {
     const elapsed = ((now - t0) / 1000) % cycle;
 
     waveTrajectories.forEach(tr => {
-      // Traiettorie della wave
-      ctx.strokeStyle = css.getPropertyValue("--line");
+      // Traiettorie intere della wave
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = lineColor;
       ctx.lineWidth = 1.5;
       ctx.beginPath();
       tr.pts.forEach((p, i) => i ? ctx.lineTo(p[0] * k, p[1] * k) : ctx.moveTo(p[0] * k, p[1] * k));
       ctx.stroke();
 
+      // Nemici attivi
       if (elapsed >= tr.delay && (elapsed - tr.delay) <= tr.tEnd) {
         const tRel = elapsed - tr.delay;
         const n = Math.max(0, Math.min(tr.pts.length - 1, Math.round(tRel / DT)));
         const p = tr.pts[n];
         if (p) {
-          // Pallino (raggio fisso a 6px anziché 7*k)
-          ctx.fillStyle = css.getPropertyValue("--acc");
+          // Pallino nemico verde acido
+          ctx.shadowColor = enemyColor;
+          ctx.shadowBlur = 10;
+          ctx.fillStyle = enemyColor;
           ctx.beginPath();
           ctx.arc(p[0] * k, p[1] * k, 6, 0, Math.PI * 2);
           ctx.fill();
 
-          // Label tipo dell'entità (font fisso a 12px)
-          ctx.fillStyle = css.getPropertyValue("--mute");
+          // Label tipo nemico
+          ctx.shadowBlur = 0;
+          ctx.fillStyle = "#fff";
           ctx.font = "12px sans-serif";
           ctx.fillText(tr.type, p[0] * k + 10, p[1] * k - 6);
         }
       }
     });
 
-    // Timer Wave (font fisso a 13px)
-    ctx.fillStyle = css.getPropertyValue("--mute");
+    // Timer Wave
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = muteColor;
     ctx.font = "13px sans-serif";
     ctx.fillText(`Wave t = ${elapsed.toFixed(1)} s`, 12, 22);
   }

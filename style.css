@@ -16,7 +16,8 @@
   --simonetta-pink: #ff2aa8;
   --simonetta-pink-glow: rgba(255, 42, 168, 0.45);
   --alien-green: #4be817;
-  --alien-green-glow: rgba(75, 232, 23, 0.4);
+  --alien-green-glow: rgba(75, 232, 23, 0.5);
+  --enemy: var(--alien-green);
   
   --acc: var(--simonetta-pink);
   --acc-hover: #ff52be;
