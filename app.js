@@ -155,14 +155,15 @@ $("reset").onclick = () => {
   $("id").value = $("meta").value = $("dur").value = "";
   stopEdit(); renderAll();
 };
-init();
-
 // ---------- Movement preview (Lissajous) ----------
 // Assumptions: visible area is VIEW_W x VIEW_H, the entity starts on the right edge at mid height.
 const VIEW_W = 800, VIEW_H = 450, DT = 1/60, T_MAX = 20, PAUSE = 0.8;
 const cv = $("pv"), ctx = cv.getContext("2d");
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 let pv = null, t0 = performance.now();
+
+// Inizializzazione dell'app
+init();
 
 // Same math as LissajousMover: integrating the velocity gives
 // x = x0 - |base|*t + ampX*sin(f*t),  y = y0 + ampY*sin(2*f*t)
