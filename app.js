@@ -157,7 +157,8 @@ $("reset").onclick = () => {
 };
 // ---------- Movement preview (Lissajous) ----------
 // Assumptions: visible area is VIEW_W x VIEW_H, the entity starts on the right edge at mid height.
-const VIEW_W = 800, VIEW_H = 450, DT = 1/60, T_MAX = 20, PAUSE = 0.8;
+// Risoluzione logica reale del gioco (Full HD)
+const VIEW_W = 1920, VIEW_H = 1080, DT = 1/60, T_MAX = 20, PAUSE = 0.8;
 const cv = $("pv"), ctx = cv.getContext("2d");
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
