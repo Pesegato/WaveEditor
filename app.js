@@ -7,8 +7,6 @@ const MOVERS = {
 };
 // Parameters shared by all movements, placed before the specific ones (0.5 in the example).
 const COMMON = ["startPosition"];
-// y0: 0 in basso => VIEW_H, 1 in alto => 0
-const y0 = VIEW_H * (1 - startPosNorm);
 const $ = id => document.getElementById(id);
 let state = {id:"", meta:"", duration:"", entities:[]};
 let editing = null;
