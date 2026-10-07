@@ -204,6 +204,7 @@ function loadFile(f) {
 
 $("up").onclick = () => $("file").click();
 $("file").onchange = ev => loadFile(ev.target.files[0]);
+$("btnSendLevel").onclick = sendWaveToLevelEditor;
 
 // ---------- Drag & Drop JSON ----------
 window.addEventListener("dragover", ev => {
